@@ -398,7 +398,7 @@ if __name__ == "__main__":
     window = Tk()
     window.title("Music Player")
     window.geometry("800x500")
-    # window.resizable(0, 0)
+    window.resizable(0, 0)
 
     app = App(window)
     song_duration = SongDuration(app)
