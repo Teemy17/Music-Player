@@ -20,7 +20,7 @@ class BaseButton:
             Image.open(image_path).resize(button_size, Image.LANCZOS)
         )
         self.button.config(image=self.button_img, command=self.action)
-        self.button.place(x=x, y=y)
+        self.button.place(relx=x, rely=y)
 
     def action(self):
         pass
@@ -215,25 +215,25 @@ class App:
         self.option_menu()
 
         self.btPlay_img = PlayButton(
-            self.window, self, "Images/play.png", 250, 250
+            self.window, self, "Images/play.png", 0.31, 0.5
         )
         self.btPause_img = PauseButton(
-            self.window, self, "Images/pause.png", 350, 250
+            self.window, self, "Images/pause.png", 0.43, 0.5
         )
         self.btStop_img = StopButton(
-            self.window, self, "Images/stop.png", 450, 250
+            self.window, self, "Images/stop.png", 0.55, 0.5
         )
         self.btNext_img = NextButton(
-            self.window, self, "Images/next.png", 550, 250
+            self.window, self, "Images/next.png", 0.67, 0.5
         )
         self.btPrev_img = PrevButton(
-            self.window, self, "Images/prev.png", 150, 250
+            self.window, self, "Images/prev.png", 0.18, 0.5
         )
         self.btDelete_img = DeleteButton(
-            self.window, self, "Images/delete.png", 700, 250, (50, 50)
+            self.window, self, "Images/delete.png", 0.8, 0.6, (50, 50)
         )
         self.btAutoPlay_img = AutoPlayButton(
-            self.window, self, "Images/autoplay.png", 700, 300, (50, 50)
+            self.window, self, "Images/autoplay.png", 0.9, 0.6, (50, 50)
         )
         # self.btShuffle_img = ShuffleButton(
         #     self.window, self, "Images/shuffle.png", 700, 350, (50, 50)
