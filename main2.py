@@ -247,15 +247,15 @@ class App:
         self.song_length = 0
 
         self.album_art_label = Label(self.window, bg="#141414", relief=SUNKEN)
-        self.album_art_label.place(x=30, y=330, width=150, height=150)
+        self.album_art_label.place(relx=0.04, rely=0.68, relwidth=0.19, relheight=0.28)
 
     def main_window(self):
         Label(
             self.window, text="Music Player", font=("Arial", 20, "bold", "italic")
-        ).place(x=320, y=20)
+        ).place(relx=0.4, rely=0.05)
 
         frame = Frame(self.window)
-        frame.place(x=30, y=70)
+        frame.place(relx=0.05, rely=0.15)
         v_scroll = Scrollbar(frame)
         v_scroll.pack(side=RIGHT, fill=Y)
 
@@ -277,7 +277,7 @@ class App:
             self.window, from_=0, to=100, orient=HORIZONTAL, command=self.volume
         )
         self.volume_slider.set(50)
-        self.volume_slider.place(x=650, y=400)
+        self.volume_slider.place(relx=0.75, rely=0.8)
 
     def option_menu(self):
         menubar = Menu(self.window)
@@ -357,7 +357,7 @@ class SongDuration:
             bg="#141414",
             width=25,
         )
-        self.song_duration_bar.place(x=220, y=400)
+        self.song_duration_bar.place(relx=0.3, rely=0.7)
         self.update_thread = None
 
     def start_update_thread(self):
@@ -398,7 +398,7 @@ if __name__ == "__main__":
     window = Tk()
     window.title("Music Player")
     window.geometry("800x500")
-    window.resizable(0, 0)
+    # window.resizable(0, 0)
 
     app = App(window)
     song_duration = SongDuration(app)
