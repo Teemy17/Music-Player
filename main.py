@@ -1,15 +1,29 @@
 import os
-from tkinter import *
-from tkinter import filedialog, messagebox
-import pygame.mixer as mixer
-from PIL import ImageTk, Image
-import time
-import threading
-from mutagen.mp3 import MP3
-from mutagen.id3 import ID3, APIC
 import io
-import pygame
 import random
+
+try:
+    from tkinter import *
+    from tkinter import filedialog, messagebox
+except ImportError:
+    print("Tkinter not found. Please install Tkinter.")
+
+try:
+    import pygame
+    import pygame.mixer as mixer
+except ImportError:
+    print("Pygame not found. Please install Pygame.")
+
+try:
+    from mutagen.mp3 import MP3
+    from mutagen.id3 import ID3, APIC
+except ImportError:
+    print("Mutagen not found. Please install Mutagen.")
+
+try:
+    from PIL import ImageTk, Image
+except ImportError:
+    print("Pillow not found. Please install Pillow.")
 
 
 class BaseButton:
@@ -22,9 +36,7 @@ class BaseButton:
         self.button.config(image=self.button_img, command=self.action)
         self.button.place(x=x, y=y)
 
-    def action(self):
-        pass
-
+    # Get the album art from the song
     def get_album_art(self, song_path):
         audio = MP3(song_path, ID3=ID3)
         album_art = None
@@ -38,6 +50,11 @@ class BaseButton:
         else:
             return None
 
+    def load_image(self, image_path, button_size):
+        self.button_img = ImageTk.PhotoImage(
+            Image.open(image_path).resize(button_size, Image.LANCZOS)
+        )
+
 
 class PlayButton(BaseButton):
     def action(self):
@@ -49,6 +66,7 @@ class PlayButton(BaseButton):
             self.app.current_song_index = self.app.song_list.curselection()[0]
             song_type = MP3(song_info["path"] + song_info["song"])
             self.app.song_length = song_type.info.length
+            self.app.display_current_song()
 
             album_art = self.get_album_art(song_info["path"] + song_info["song"])
             self.app.display_album_art(album_art)
@@ -61,24 +79,12 @@ class PlayButton(BaseButton):
 class PauseButton(BaseButton):
     def action(self):
         if self.app.paused == False:
-            if (
-                isinstance(self.app.btAutoPlay_img, AutoPlayButton)
-                and self.app.btAutoPlay_img.autoplay_enabled
-            ):
-                self.app.autoplay_paused = True
-                self.app.btAutoPlay_img.disable_autoplay()
-            else:
-                self.app.autoplay_paused = False
-            self.app.paused = True
             mixer.music.pause()
-            SongDuration(self.app).song_duration_time()
+            self.app.paused = True
         else:
-            self.app.paused = False
             mixer.music.unpause()
+            self.app.paused = False
             SongDuration(self.app).song_duration_time()
-            if self.app.autoplay_paused:
-                self.app.btAutoPlay_img.toggle_autoplay()
-            self.app.autoplay_paused = False
 
 
 class StopButton(BaseButton):
@@ -86,6 +92,7 @@ class StopButton(BaseButton):
         mixer.music.stop()
         self.app.song_list.select_clear(0, END)
         self.app.paused = False
+        self.app.display_current_song_reset()
         SongDuration(self.app)
 
         if isinstance(self.app.btAutoPlay_img, AutoPlayButton):
@@ -94,7 +101,7 @@ class StopButton(BaseButton):
 
 class NextButton(BaseButton):
     def action(self):
-        if self.app.current_song_index + 1 < len(self.app.directory_list):
+        if self.app.current_song_index + 1 < len(self.app.directory_list) and mixer.music.get_busy():
             next_song_index = self.app.current_song_index + 1
             song_info = self.app.directory_list[next_song_index]
             mixer.music.load(song_info["path"] + song_info["song"])
@@ -103,18 +110,20 @@ class NextButton(BaseButton):
             self.app.song_list.select_clear(0, END)
             self.app.song_list.select_set(next_song_index)
             self.app.song_list.activate(next_song_index)
+            self.app.display_current_song()
 
             album_art = self.get_album_art(song_info["path"] + song_info["song"])
             self.app.display_album_art(album_art)
 
             SongDuration(self.app).song_duration_time()
+
         else:
             print("No more songs in the list")
 
 
 class PrevButton(BaseButton):
     def action(self):
-        if self.app.current_song_index > 0:
+        if self.app.current_song_index > 0 and mixer.music.get_busy():
             prev_song_index = self.app.current_song_index - 1
             song_info = self.app.directory_list[prev_song_index]
             mixer.music.load(song_info["path"] + song_info["song"])
@@ -123,9 +132,12 @@ class PrevButton(BaseButton):
             self.app.song_list.select_clear(0, END)
             self.app.song_list.select_set(prev_song_index)
             self.app.song_list.activate(prev_song_index)
+            self.app.display_current_song()
 
             album_art = self.get_album_art(song_info["path"] + song_info["song"])
             self.app.display_album_art(album_art)
+
+            SongDuration(self.app).song_duration_time()
 
         else:
             print("This is the first song in the list")
@@ -142,7 +154,6 @@ class DeleteButton(BaseButton):
             if selected_index[0] == self.app.current_song_index:
                 StopButton.action(self)
             self.app.song_list.delete(selected_index[0])
-            SongDuration(self.app)
             print(f"Deleted song: {selected_song}")
         else:
             messagebox.showerror("Error", "Please select a song to delete")
@@ -155,15 +166,16 @@ class AutoPlayButton(BaseButton):
         self.root = root
 
     def action(self):
-        if not self.autoplay_enabled:
+        if self.autoplay_enabled == False:
             self.enable_autoplay()
             print("Autoplay enabled")
-        else:
+        elif self.autoplay_enabled == True:
             self.disable_autoplay()
 
     def enable_autoplay(self):
         self.autoplay_enabled = True
         self.play_next_song_after_delay()
+        self.change_button_image("Images/autoon.png")
         print("Autoplay will start after the current song ends")
 
     def play_next_song_after_delay(self):
@@ -171,10 +183,11 @@ class AutoPlayButton(BaseButton):
 
     def disable_autoplay(self):
         self.autoplay_enabled = False
+        self.change_button_image("Images/autooff.png")
         print("Autoplay disabled")
 
     def check_music_status(self):
-        if not pygame.mixer.music.get_busy():
+        if not pygame.mixer.music.get_busy() and self.app.paused == False:
             self.play_next_song()
         if self.autoplay_enabled:
             self.root.after(100, self.check_music_status)
@@ -190,6 +203,7 @@ class AutoPlayButton(BaseButton):
                 self.app.song_list.select_clear(0, END)
                 self.app.song_list.select_set(next_song_index)
                 self.app.song_list.activate(next_song_index)
+                self.app.display_current_song()
 
                 album_art = self.get_album_art(song_info["path"] + song_info["song"])
                 self.app.display_album_art(album_art)
@@ -199,12 +213,25 @@ class AutoPlayButton(BaseButton):
                 print("No more songs in the list")
                 self.autoplay_enabled = False
 
+    def change_button_image(self, new_image_path):
+        self.load_image(new_image_path, button_size=(50, 50))
+        self.button.configure(image=self.button_img, command=self.action)
+
+
 class ShuffleButton(BaseButton):
     def __init__(self, root, app, image_path, x, y, button_size=(80, 80)):
         super().__init__(root, app, image_path, x, y, button_size)
 
+    # Shuffle the song in the list
     def action(self):
-        pass
+        random.shuffle(self.app.directory_list)
+        self.app.song_list.delete(0, END)
+        for song_info in self.app.directory_list:
+            self.app.song_list.insert(END, song_info["song"])
+
+        self.app.current_song_index = 0
+        self.app.song_list.select_set(0)
+
 
 class App:
     def __init__(self, root):
@@ -214,40 +241,12 @@ class App:
         self.directory_list = []
         self.option_menu()
 
-        self.btPlay_img = PlayButton(
-            self.window, self, "Images/play.png", 250, 250
-        )
-        self.btPause_img = PauseButton(
-            self.window, self, "Images/pause.png", 350, 250
-        )
-        self.btStop_img = StopButton(
-            self.window, self, "Images/stop.png", 450, 250
-        )
-        self.btNext_img = NextButton(
-            self.window, self, "Images/next.png", 550, 250
-        )
-        self.btPrev_img = PrevButton(
-            self.window, self, "Images/prev.png", 150, 250
-        )
-        self.btDelete_img = DeleteButton(
-            self.window, self, "Images/delete.png", 700, 250, (50, 50)
-        )
-        self.btAutoPlay_img = AutoPlayButton(
-            self.window, self, "Images/autoplay.png", 700, 300, (50, 50)
-        )
-        # self.btShuffle_img = ShuffleButton(
-        #     self.window, self, "Images/shuffle.png", 700, 350, (50, 50)
-        # )
-
         self.current_song_index = 0
         self.paused = False
         self.autoplay = False
 
         self.song_duration_bar = 0
         self.song_length = 0
-
-        self.album_art_label = Label(self.window, bg="#141414", relief=SUNKEN)
-        self.album_art_label.place(x=30, y=330, width=150, height=150)
 
     def main_window(self):
         Label(
@@ -273,11 +272,50 @@ class App:
         self.song_list.pack(side=LEFT)
         v_scroll.configure(command=self.song_list.yview)
 
+        self.volume_label = Label(
+            self.window, text="Volume", font=("Arial", 12, "bold"), fg="black"
+        )
+        self.volume_label.place(x=650, y=380)
         self.volume_slider = Scale(
             self.window, from_=0, to=100, orient=HORIZONTAL, command=self.volume
         )
         self.volume_slider.set(50)
         self.volume_slider.place(x=650, y=400)
+
+        self.btPlay_img = PlayButton(self.window, self, "Images/play.png", 250, 250)
+        self.btPause_img = PauseButton(self.window, self, "Images/pause.png", 350, 250)
+        self.btStop_img = StopButton(self.window, self, "Images/stop.png", 450, 250)
+        self.btNext_img = NextButton(self.window, self, "Images/next.png", 550, 250)
+        self.btPrev_img = PrevButton(self.window, self, "Images/prev.png", 150, 250)
+        self.btDelete_img = DeleteButton(
+            self.window, self, "Images/delete.png", 50, 260, (40, 40)
+        )
+        self.btAutoPlay_img = AutoPlayButton(
+            self.window, self, "Images/autooff.png", 700, 270, (50, 50)
+        )
+        self.btShuffle_img = ShuffleButton(
+            self.window, self, "Images/shuffle.png", 700, 350, (50, 50)
+        )
+
+        self.autoplay_label = Label(
+            self.window, text="Autoplay", font=("Arial", 12, "bold"), fg="black"
+        ).place(x=700, y=250)
+        self.autoplay_label_on = Label(
+            self.window, text="On", font=("Arial", 12), fg="black"
+        ).place(x=740, y=320)
+        self.autoplay_label_off = Label(
+            self.window, text="Off", font=("Arial", 12), fg="black"
+        ).place(x=700, y=320)
+        self.current_song_label = Label(
+            self.window, text="Song label", font=("Arial", 12), fg="white", bg="#141414"
+        )
+        self.delete_song_label = Label(
+            self.window, text="Delete", font=("Arial", 12), fg="black"
+        ).place(x=50, y=300)
+
+        self.current_song_label.place(x=250, y=450)
+        self.album_art_label = Label(self.window, bg="#141414", relief=SUNKEN)
+        self.album_art_label.place(x=30, y=330, width=150, height=150)
 
     def option_menu(self):
         menubar = Menu(self.window)
@@ -289,35 +327,60 @@ class App:
         options_menu.add_command(label="Add folder", command=self.add_folder)
 
     def add_song(self):
-        songs = filedialog.askopenfilenames(
-            title="Select one or multiple song", filetypes=[("mp3 Files", "*.mp3")]
-        )
-        for song in songs:
-            song_name = os.path.basename(song)
-            directory_path = song.replace(song_name, "")
-            self.directory_list.append({"path": directory_path, "song": song_name})
-            self.song_list.insert(END, song_name)
-        self.song_list.select_set("0")
-
-    def add_folder(self):
-        folder_path = filedialog.askdirectory(title="Select a folder containing songs")
-        if folder_path:
-            songs = [file for file in os.listdir(folder_path) if file.endswith(".mp3")]
-            if songs:
-                for song in songs:
-                    song_name = os.path.basename(song)
+        try:
+            songs = filedialog.askopenfilenames(
+                title="Select one or multiple song", filetypes=[("mp3 Files", "*.mp3")]
+            )
+            for song in songs:
+                song_name = os.path.basename(song)
+                directory_path = song.replace(song_name, "")
+                # Check if the song is already in the list
+                if not any(item["song"] == song_name for item in self.directory_list):
                     self.directory_list.append(
-                        {"path": folder_path + "/", "song": song_name}
+                        {"path": directory_path, "song": song_name}
                     )
                     self.song_list.insert(END, song_name)
-                self.song_list.select_set(0)
-            else:
-                messagebox.showinfo(
-                    "Info", "No MP3 files found in the selected folder."
-                )
-        else:
-            messagebox.showinfo("Info", "No folder selected.")
+                else:
+                    messagebox.showerror("Error", f"{song_name} is already in the list")
 
+            self.song_list.select_set("0")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"An error occurred: {str(e)}")
+
+    def add_folder(self):
+        try:
+            folder_path = filedialog.askdirectory(
+                title="Select a folder containing songs"
+            )
+            if folder_path:
+                songs = [
+                    file for file in os.listdir(folder_path) if file.endswith(".mp3")
+                ]
+                if songs:
+                    for song in songs:
+                        song_name = os.path.basename(song)
+                        # Check if the song is already in the list
+                        if not any(
+                            item["song"] == song_name for item in self.directory_list
+                        ):
+                            self.directory_list.append(
+                                {"path": folder_path + "/", "song": song_name}
+                            )
+                            self.song_list.insert(END, song_name)
+
+                    self.song_list.select_set(0)
+                else:
+                    messagebox.showinfo(
+                        "Info", "No MP3 files found in the selected folder."
+                    )
+            else:
+                messagebox.showinfo("Info", "No folder selected.")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"An error occurred: {str(e)}")
+
+    # Attain album art from the song
     def display_album_art(self, album_art):
         if album_art is not None:
             img_data = album_art.data
@@ -327,7 +390,7 @@ class App:
             self.album_art_label.config(image=album_art_img)
             self.album_art_label.image = album_art_img
         else:
-            default_img_path = "Python project/Images/default.png"
+            default_img_path = "Images/default.png"
             default_img = Image.open(default_img_path)
             default_img = default_img.resize((150, 150), Image.LANCZOS)
 
@@ -339,13 +402,19 @@ class App:
         volume = int(val) / 100
         mixer.music.set_volume(volume)
 
-    def Shuffle(self):
-        pass
+    def display_current_song(self):
+        if self.directory_list:
+            current_song_info = self.directory_list[self.current_song_index]
+            current_song_name = current_song_info["song"]
+            self.current_song_label.config(
+                text=f"Currently Playing: {current_song_name}"
+            )
 
-    def Repeat(self):
-        pass
+    def display_current_song_reset(self):
+        self.current_song_label.config(text="Song label")
 
 
+# Display the song duration in time
 class SongDuration:
     def __init__(self, app):
         self.app = app
@@ -357,14 +426,7 @@ class SongDuration:
             bg="#141414",
             width=25,
         )
-        self.song_duration_bar.place(x=220, y=400)
-        self.update_thread = None
-
-    def start_update_thread(self):
-        if not self.update_thread:
-            self.update_thread = threading.Thread(target=self.song_duration_time)
-            self.update_thread.daemon = True
-            self.update_thread.start()
+        self.song_duration_bar.place(x=250, y=400)
 
     def update_song_duration_label(self, current_time):
         song_info = self.app.directory_list[self.app.current_song_index]
@@ -373,14 +435,13 @@ class SongDuration:
         self.song_duration_bar.config(
             text=f"Time is: {self.format_time(current_time)} of {self.format_time(song_length)}"
         )
+        self.app.window.after(100, self.song_duration_time)
 
     def song_duration_time(self):
         try:
-            while mixer.music.get_busy():
+            if mixer.music.get_busy() or self.app.paused:
                 current_time = mixer.music.get_pos() / 1000
                 self.update_song_duration_label(current_time)
-                self.app.window.update()
-                time.sleep(0.1)
         except Exception as e:
             print("Error in song duration:", str(e))
 
@@ -388,10 +449,6 @@ class SongDuration:
         minutes, seconds = divmod(int(time_in_seconds), 60)
         hours, minutes = divmod(minutes, 60)
         return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-
-class DurationBar:
-    def __init__(self, app):
-        self.app
 
 
 if __name__ == "__main__":
@@ -402,6 +459,5 @@ if __name__ == "__main__":
 
     app = App(window)
     song_duration = SongDuration(app)
-    song_duration.start_update_thread()
 
     window.mainloop()
