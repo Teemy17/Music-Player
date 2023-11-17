@@ -93,6 +93,8 @@ class StopButton(BaseButton):
         self.app.song_list.select_clear(0, END)
         self.app.paused = False
         self.app.display_current_song_reset()
+        self.app.display_album_art(None)
+        self.app.current_song_index = 0
         SongDuration(self.app)
 
         if isinstance(self.app.btAutoPlay_img, AutoPlayButton):
@@ -101,7 +103,7 @@ class StopButton(BaseButton):
 
 class NextButton(BaseButton):
     def action(self):
-        if self.app.current_song_index + 1 < len(self.app.directory_list) and mixer.music.get_busy():
+        if self.app.current_song_index + 1 < len(self.app.directory_list):
             next_song_index = self.app.current_song_index + 1
             song_info = self.app.directory_list[next_song_index]
             mixer.music.load(song_info["path"] + song_info["song"])
@@ -224,13 +226,16 @@ class ShuffleButton(BaseButton):
 
     # Shuffle the song in the list
     def action(self):
-        random.shuffle(self.app.directory_list)
-        self.app.song_list.delete(0, END)
-        for song_info in self.app.directory_list:
-            self.app.song_list.insert(END, song_info["song"])
+        if not self.app.directory_list == []:
+            random.shuffle(self.app.directory_list)
+            self.app.song_list.delete(0, END)
+            for song_info in self.app.directory_list:
+                self.app.song_list.insert(END, song_info["song"])
 
-        self.app.current_song_index = 0
-        self.app.song_list.select_set(0)
+            self.app.current_song_index = 0
+            self.app.song_list.select_set(0)
+        else:
+            messagebox.showerror("Error no song", "No songs in the list")
 
 
 class App:
@@ -247,6 +252,8 @@ class App:
 
         self.song_duration_bar = 0
         self.song_length = 0
+
+        self.display_album_art(None)
 
     def main_window(self):
         Label(
@@ -291,10 +298,10 @@ class App:
             self.window, self, "Images/delete.png", 50, 260, (40, 40)
         )
         self.btAutoPlay_img = AutoPlayButton(
-            self.window, self, "Images/autooff.png", 700, 270, (50, 50)
+            self.window, self, "Images/autooff.png", 710, 270, (50, 50)
         )
         self.btShuffle_img = ShuffleButton(
-            self.window, self, "Images/shuffle.png", 700, 350, (50, 50)
+            self.window, self, "Images/shuffle.png", 720, 350, (40, 40)
         )
 
         self.autoplay_label = Label(
