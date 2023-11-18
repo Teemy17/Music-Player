@@ -9,14 +9,13 @@ except ImportError:
     print("Tkinter not found. Please install Tkinter.")
 
 try:
-    import pygame
     import pygame.mixer as mixer
 except ImportError:
     print("Pygame not found. Please install Pygame.")
 
 try:
     from mutagen.mp3 import MP3
-    from mutagen.id3 import ID3, APIC
+    from mutagen.id3 import ID3
 except ImportError:
     print("Mutagen not found. Please install Mutagen.")
 
@@ -80,11 +79,17 @@ class PauseButton(BaseButton):
     def action(self):
         if self.app.paused == False:
             mixer.music.pause()
+            self.change_button_image("Images/unpause.png")
             self.app.paused = True
         else:
             mixer.music.unpause()
             self.app.paused = False
+            self.change_button_image("Images/pause.png")
             SongDuration(self.app).song_duration_time()
+
+    def change_button_image(self, new_image_path):
+        self.load_image(new_image_path, button_size=(80, 80))
+        self.button.configure(image=self.button_img, command=self.action)
 
 
 class StopButton(BaseButton):
@@ -125,7 +130,7 @@ class NextButton(BaseButton):
 
 class PrevButton(BaseButton):
     def action(self):
-        if self.app.current_song_index > 0 and mixer.music.get_busy():
+        if self.app.current_song_index > 0:
             prev_song_index = self.app.current_song_index - 1
             song_info = self.app.directory_list[prev_song_index]
             mixer.music.load(song_info["path"] + song_info["song"])
@@ -170,18 +175,19 @@ class AutoPlayButton(BaseButton):
     def action(self):
         if self.autoplay_enabled == False:
             self.enable_autoplay()
-            print("Autoplay enabled")
         elif self.autoplay_enabled == True:
             self.disable_autoplay()
 
     def enable_autoplay(self):
         self.autoplay_enabled = True
-        self.play_next_song_after_delay()
         self.change_button_image("Images/autoon.png")
-        print("Autoplay will start after the current song ends")
+        print("Autoplay enabled")
+        self.play_next_song_after_delay()
 
     def play_next_song_after_delay(self):
-        self.root.after(100, self.check_music_status)
+        if self.autoplay_enabled:
+            self.check_music_status()
+            self.root.after(1000, self.play_next_song_after_delay)
 
     def disable_autoplay(self):
         self.autoplay_enabled = False
@@ -189,18 +195,16 @@ class AutoPlayButton(BaseButton):
         print("Autoplay disabled")
 
     def check_music_status(self):
-        if not pygame.mixer.music.get_busy() and self.app.paused == False:
+        if not mixer.music.get_busy() and self.app.paused == False:
             self.play_next_song()
-        if self.autoplay_enabled:
-            self.root.after(100, self.check_music_status)
 
     def play_next_song(self):
         if self.autoplay_enabled:
             if self.app.current_song_index + 1 < len(self.app.directory_list):
                 next_song_index = self.app.current_song_index + 1
                 song_info = self.app.directory_list[next_song_index]
-                pygame.mixer.music.load(song_info["path"] + song_info["song"])
-                pygame.mixer.music.play()
+                mixer.music.load(song_info["path"] + song_info["song"])
+                mixer.music.play()
                 self.app.current_song_index = next_song_index
                 self.app.song_list.select_clear(0, END)
                 self.app.song_list.select_set(next_song_index)
@@ -213,7 +217,7 @@ class AutoPlayButton(BaseButton):
                 SongDuration(self.app).song_duration_time()
             else:
                 print("No more songs in the list")
-                self.autoplay_enabled = False
+                self.disable_autoplay()
 
     def change_button_image(self, new_image_path):
         self.load_image(new_image_path, button_size=(50, 50))
@@ -235,7 +239,7 @@ class ShuffleButton(BaseButton):
             self.app.current_song_index = 0
             self.app.song_list.select_set(0)
         else:
-            messagebox.showerror("Error no song", "No songs in the list")
+            messagebox.showerror("Error no song", "No songs in the list to shuffle")
 
 
 class App:
@@ -248,7 +252,6 @@ class App:
 
         self.current_song_index = 0
         self.paused = False
-        self.autoplay = False
 
         self.song_duration_bar = 0
         self.song_length = 0
@@ -387,7 +390,7 @@ class App:
         except Exception as e:
             messagebox.showerror("Error", f"An error occurred: {str(e)}")
 
-    # Attain album art from the song
+    # Attain album art from the song if available
     def display_album_art(self, album_art):
         if album_art is not None:
             img_data = album_art.data
@@ -463,6 +466,10 @@ if __name__ == "__main__":
     window.title("Music Player")
     window.geometry("800x500")
     window.resizable(0, 0)
+
+    ico = Image.open("Images/icon.png")
+    photo = ImageTk.PhotoImage(ico)
+    window.wm_iconphoto(False, photo)
 
     app = App(window)
     song_duration = SongDuration(app)
