@@ -77,7 +77,7 @@ class PlayButton(BaseButton):
 
 class PauseButton(BaseButton):
     def action(self):
-        if self.app.paused == False:
+        if self.app.paused == False and mixer.music.get_busy():
             mixer.music.pause()
             self.change_button_image("Images/unpause.png")
             self.app.paused = True
