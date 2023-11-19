@@ -402,7 +402,7 @@ class App:
         else:
             default_img_path = "Images/default.png"
             default_img = Image.open(default_img_path)
-            default_img = default_img.resize((150, 150), Image.LANCZOS)
+            default_img = default_img.resize((140, 140), Image.LANCZOS)
 
             default_album_art_img = ImageTk.PhotoImage(default_img)
             self.album_art_label.config(image=default_album_art_img)
